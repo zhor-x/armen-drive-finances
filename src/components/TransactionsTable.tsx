@@ -52,14 +52,14 @@ export const TransactionsTable = ({ transactions, categories, onDelete, type }: 
         </div>
       </div>
 
-      <div className="rounded-lg border">
+      <div className="rounded-lg border overflow-x-auto">
         <Table>
           <TableHeader>
             <TableRow>
-              <TableHead>Ամսաթիվ</TableHead>
-              <TableHead>Կատեգորիա</TableHead>
-              <TableHead>Նկարագրություն</TableHead>
-              <TableHead className="text-right">Գումար</TableHead>
+              <TableHead className="whitespace-nowrap">Ամսաթիվ</TableHead>
+              <TableHead className="whitespace-nowrap">Կատեգորիա</TableHead>
+              <TableHead className="hidden sm:table-cell">Նկարագրություն</TableHead>
+              <TableHead className="text-right whitespace-nowrap">Գումար</TableHead>
               <TableHead className="w-[50px]"></TableHead>
             </TableRow>
           </TableHeader>
@@ -75,17 +75,24 @@ export const TransactionsTable = ({ transactions, categories, onDelete, type }: 
                 const category = getCategoryById(transaction.categoryId);
                 return (
                   <TableRow key={transaction.id}>
-                    <TableCell className="font-medium">
-                      {format(new Date(transaction.date), 'dd MMM yyyy', { locale: hy })}
+                    <TableCell className="font-medium whitespace-nowrap text-xs sm:text-sm">
+                      {format(new Date(transaction.date), 'dd MMM', { locale: hy })}
                     </TableCell>
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <span className="text-lg">{category?.icon}</span>
-                        <span>{category?.name}</span>
+                      <div className="flex items-center gap-1 sm:gap-2">
+                        <span className="text-base sm:text-lg">{category?.icon}</span>
+                        <div className="min-w-0">
+                          <span className="text-xs sm:text-sm block truncate">{category?.name}</span>
+                          <span className="text-xs text-muted-foreground sm:hidden block truncate">
+                            {transaction.description}
+                          </span>
+                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="max-w-xs truncate">{transaction.description}</TableCell>
-                    <TableCell className={`text-right font-semibold ${type === 'income' ? 'text-success' : 'text-destructive'}`}>
+                    <TableCell className="max-w-xs truncate hidden sm:table-cell text-sm">
+                      {transaction.description}
+                    </TableCell>
+                    <TableCell className={`text-right font-semibold whitespace-nowrap text-xs sm:text-sm ${type === 'income' ? 'text-success' : 'text-destructive'}`}>
                       {formatAmount(transaction.amount)}
                     </TableCell>
                     <TableCell>
@@ -93,9 +100,9 @@ export const TransactionsTable = ({ transactions, categories, onDelete, type }: 
                         variant="ghost"
                         size="icon"
                         onClick={() => onDelete(transaction.id)}
-                        className="h-8 w-8 text-destructive hover:text-destructive"
+                        className="h-7 w-7 sm:h-8 sm:w-8 text-destructive hover:text-destructive"
                       >
-                        <Trash2 className="h-4 w-4" />
+                        <Trash2 className="h-3 w-3 sm:h-4 sm:w-4" />
                       </Button>
                     </TableCell>
                   </TableRow>
@@ -107,7 +114,7 @@ export const TransactionsTable = ({ transactions, categories, onDelete, type }: 
       </div>
 
       {filteredTransactions.length > 0 && (
-        <div className="flex items-center justify-between text-sm text-muted-foreground">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-2 text-xs sm:text-sm text-muted-foreground">
           <p>Ընդամենը {filteredTransactions.length} գործարք</p>
           <p className="font-semibold">
             Ընդհանուր: {formatAmount(filteredTransactions.reduce((sum, t) => sum + t.amount, 0))}

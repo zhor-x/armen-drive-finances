@@ -19,18 +19,18 @@ const Expense = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
-      <div className="flex items-center justify-between">
+    <div className="container mx-auto px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-3xl font-bold mb-2 flex items-center gap-2">
-            <TrendingDown className="h-8 w-8 text-destructive" />
+          <h2 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center gap-2">
+            <TrendingDown className="h-6 w-6 sm:h-8 sm:w-8 text-destructive" />
             Ծախսեր
           </h2>
-          <p className="text-muted-foreground">
+          <p className="text-sm sm:text-base text-muted-foreground">
             Ավտոդպրոցի բոլոր ծախսերը և դրանց կատեգորիաները
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex gap-2 w-full sm:w-auto">
           <CategoryDialog onAdd={addCategory} type="expense" />
           <TransactionDialog
             categories={expenseCategories}
@@ -41,15 +41,15 @@ const Expense = () => {
       </div>
 
       <Card className="bg-gradient-expense">
-        <CardContent className="p-6">
+        <CardContent className="p-4 sm:p-6">
           <div className="text-center">
-            <p className="text-sm font-medium text-white/90 mb-2">Ընդհանուր ծախս</p>
-            <p className="text-4xl font-bold text-white">{formatAmount(summary.totalExpense)}</p>
+            <p className="text-xs sm:text-sm font-medium text-white/90 mb-2">Ընդհանուր ծախս</p>
+            <p className="text-2xl sm:text-4xl font-bold text-white">{formatAmount(summary.totalExpense)}</p>
           </div>
         </CardContent>
       </Card>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
         <div className="lg:col-span-2">
           <Card>
             <CardHeader>

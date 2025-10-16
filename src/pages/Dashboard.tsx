@@ -28,13 +28,13 @@ const Dashboard = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8 space-y-8">
+    <div className="container mx-auto px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
       <div>
-        <h2 className="text-3xl font-bold mb-2">Ֆինանսական ակնարկ</h2>
-        <p className="text-muted-foreground">Ավտոդպրոցի ընդհանուր ֆինանսական վիճակ</p>
+        <h2 className="text-2xl sm:text-3xl font-bold mb-2">Ֆինանսական ակնարկ</h2>
+        <p className="text-sm sm:text-base text-muted-foreground">Ավտոդպրոցի ընդհանուր ֆինանսական վիճակ</p>
       </div>
 
-      <div className="grid gap-6 md:grid-cols-3">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard
           title="Ընդհանուր եկամուտ"
           amount={summary.totalIncome}
@@ -55,7 +55,7 @@ const Dashboard = () => {
         />
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-2">
+      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-2">
         <CategorySummary
           categories={incomeCategories}
           categoryTotals={summary.incomeByCategory}
@@ -81,22 +81,27 @@ const Dashboard = () => {
             {recentTransactions.map((transaction) => {
               const category = getCategoryById(transaction.categoryId);
               return (
-                <div key={transaction.id} className="flex items-center justify-between p-3 rounded-lg bg-accent/50">
-                  <div className="flex items-center gap-3">
-                    <div className="text-2xl">{category?.icon}</div>
-                    <div>
-                      <p className="font-medium">{category?.name}</p>
-                      <p className="text-sm text-muted-foreground">
-                        {format(new Date(transaction.date), 'dd MMMM yyyy', { locale: hy })}
+                <div key={transaction.id} className="flex items-start sm:items-center justify-between p-3 rounded-lg bg-accent/50 gap-2">
+                  <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0 flex-1">
+                    <div className="text-xl sm:text-2xl flex-shrink-0">{category?.icon}</div>
+                    <div className="min-w-0 flex-1">
+                      <p className="font-medium text-sm sm:text-base truncate">{category?.name}</p>
+                      <p className="text-xs sm:text-sm text-muted-foreground">
+                        {format(new Date(transaction.date), 'dd MMM yyyy', { locale: hy })}
                       </p>
+                      {transaction.description && (
+                        <p className="text-xs sm:text-sm text-muted-foreground truncate sm:hidden">
+                          {transaction.description}
+                        </p>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right">
-                    <p className={`font-semibold ${transaction.type === 'income' ? 'text-success' : 'text-destructive'}`}>
+                  <div className="text-right flex-shrink-0">
+                    <p className={`font-semibold text-sm sm:text-base ${transaction.type === 'income' ? 'text-success' : 'text-destructive'}`}>
                       {transaction.type === 'income' ? '+' : '-'}{formatAmount(transaction.amount)}
                     </p>
                     {transaction.description && (
-                      <p className="text-sm text-muted-foreground max-w-xs truncate">
+                      <p className="text-sm text-muted-foreground max-w-[150px] truncate hidden sm:block">
                         {transaction.description}
                       </p>
                     )}

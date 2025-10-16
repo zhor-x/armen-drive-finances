@@ -36,28 +36,28 @@ export const CategorySummary = ({ categories, categoryTotals, total, type, onDel
 
           return (
             <div key={category.id} className="space-y-2">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <span className="text-xl">{category.icon}</span>
-                  <span className="font-medium">{category.name}</span>
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0 flex-1">
+                  <span className="text-lg sm:text-xl flex-shrink-0">{category.icon}</span>
+                  <span className="font-medium text-sm sm:text-base truncate">{category.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className={`font-semibold ${type === 'income' ? 'text-success' : 'text-destructive'}`}>
+                <div className="flex items-center gap-1 sm:gap-2 flex-shrink-0">
+                  <span className={`font-semibold text-xs sm:text-sm ${type === 'income' ? 'text-success' : 'text-destructive'}`}>
                     {formatAmount(amount)}
                   </span>
                   <Button
                     variant="ghost"
                     size="icon"
                     onClick={() => onDeleteCategory(category.id)}
-                    className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                    className="h-6 w-6 sm:h-7 sm:w-7 text-muted-foreground hover:text-destructive"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-3 w-3 sm:h-3.5 sm:w-3.5" />
                   </Button>
                 </div>
               </div>
               <div className="flex items-center gap-2">
                 <Progress value={percentage} className="flex-1" />
-                <span className="text-sm text-muted-foreground w-12 text-right">
+                <span className="text-xs sm:text-sm text-muted-foreground w-10 sm:w-12 text-right flex-shrink-0">
                   {percentage.toFixed(0)}%
                 </span>
               </div>

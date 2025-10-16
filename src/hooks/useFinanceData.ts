@@ -55,6 +55,12 @@ export const useFinanceData = () => {
     setTransactions([newTransaction, ...transactions]);
   };
 
+  const updateTransaction = (id: string, updatedTransaction: Partial<Transaction>) => {
+    setTransactions(transactions.map(t => 
+      t.id === id ? { ...t, ...updatedTransaction } : t
+    ));
+  };
+
   const deleteTransaction = (id: string) => {
     setTransactions(transactions.filter(t => t.id !== id));
   };
@@ -88,6 +94,7 @@ export const useFinanceData = () => {
     transactions,
     summary,
     addTransaction,
+    updateTransaction,
     deleteTransaction,
     addCategory,
     deleteCategory,

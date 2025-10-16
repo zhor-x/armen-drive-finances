@@ -1,10 +1,12 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { useFinanceData } from '@/hooks/useFinanceData';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import { BarChart3 } from 'lucide-react';
+import { format, parseISO, startOfMonth, endOfMonth, eachMonthOfInterval } from 'date-fns';
+import { hy } from 'date-fns/locale';
 
 const Analytics = () => {
-  const { summary, incomeCategories, expenseCategories } = useFinanceData();
+  const { summary, incomeCategories, expenseCategories, transactions } = useFinanceData();
 
   const formatAmount = (num: number) => {
     return new Intl.NumberFormat('hy-AM', {
@@ -34,6 +36,33 @@ const Analytics = () => {
     }
   ];
 
+  // Monthly trend data
+  const monthlyData = (() => {
+    const grouped: Record<string, { income: number; expense: number }> = {};
+    
+    transactions.forEach(t => {
+      const monthKey = format(parseISO(t.date), 'yyyy-MM');
+      if (!grouped[monthKey]) {
+        grouped[monthKey] = { income: 0, expense: 0 };
+      }
+      if (t.type === 'income') {
+        grouped[monthKey].income += t.amount;
+      } else {
+        grouped[monthKey].expense += t.amount;
+      }
+    });
+
+    return Object.keys(grouped)
+      .sort()
+      .slice(-6) // Last 6 months
+      .map(key => ({
+        month: format(parseISO(key + '-01'), 'MMM', { locale: hy }),
+        Եկամուտ: grouped[key].income,
+        Ծախս: grouped[key].expense,
+        Շահույթ: grouped[key].income - grouped[key].expense,
+      }));
+  })();
+
   const COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#14b8a6', '#f97316'];
 
   return (
@@ -48,25 +77,47 @@ const Analytics = () => {
         </p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Եկամուտ vs Ծախս</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <ResponsiveContainer width="100%" height={300}>
-            <BarChart data={comparisonData}>
-              <CartesianGrid strokeDasharray="3 3" />
-              <XAxis dataKey="name" />
-              <YAxis />
-              <Tooltip formatter={(value) => formatAmount(Number(value))} />
-              <Legend />
-              <Bar dataKey="Եկամուտ" fill="hsl(var(--success))" />
-              <Bar dataKey="Ծախս" fill="hsl(var(--destructive))" />
-              <Bar dataKey="Շահույթ" fill="hsl(var(--primary))" />
-            </BarChart>
-          </ResponsiveContainer>
-        </CardContent>
-      </Card>
+      <div className="grid gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>Եկամուտ vs Ծախս</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <BarChart data={comparisonData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="name" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatAmount(Number(value))} />
+                <Legend />
+                <Bar dataKey="Եկամուտ" fill="hsl(var(--success))" />
+                <Bar dataKey="Ծախս" fill="hsl(var(--destructive))" />
+                <Bar dataKey="Շահույթ" fill="hsl(var(--primary))" />
+              </BarChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Ամսական միտում</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <ResponsiveContainer width="100%" height={300}>
+              <LineChart data={monthlyData}>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis dataKey="month" />
+                <YAxis />
+                <Tooltip formatter={(value) => formatAmount(Number(value))} />
+                <Legend />
+                <Line type="monotone" dataKey="Եկամուտ" stroke="hsl(var(--success))" strokeWidth={2} />
+                <Line type="monotone" dataKey="Ծախս" stroke="hsl(var(--destructive))" strokeWidth={2} />
+                <Line type="monotone" dataKey="Շահույթ" stroke="hsl(var(--primary))" strokeWidth={2} />
+              </LineChart>
+            </ResponsiveContainer>
+          </CardContent>
+        </Card>
+      </div>
 
       <div className="grid gap-6 lg:grid-cols-2">
         <Card>

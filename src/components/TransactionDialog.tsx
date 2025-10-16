@@ -12,11 +12,19 @@ interface TransactionDialogProps {
   categories: Category[];
   onAdd: (transaction: Omit<Transaction, 'id'>) => void;
   type: 'income' | 'expense';
+  editMode?: boolean;
+  initialData?: Transaction;
+  onClose?: () => void;
 }
 
-export const TransactionDialog = ({ categories, onAdd, type }: TransactionDialogProps) => {
-  const [open, setOpen] = useState(false);
-  const [formData, setFormData] = useState({
+export const TransactionDialog = ({ categories, onAdd, type, editMode, initialData, onClose }: TransactionDialogProps) => {
+  const [open, setOpen] = useState(editMode || false);
+  const [formData, setFormData] = useState(initialData ? {
+    categoryId: initialData.categoryId,
+    amount: initialData.amount.toString(),
+    description: initialData.description || '',
+    date: initialData.date,
+  } : {
     categoryId: '',
     amount: '',
     description: '',
@@ -35,26 +43,36 @@ export const TransactionDialog = ({ categories, onAdd, type }: TransactionDialog
       type,
     });
 
-    setFormData({
-      categoryId: '',
-      amount: '',
-      description: '',
-      date: new Date().toISOString().split('T')[0],
-    });
+    if (!editMode) {
+      setFormData({
+        categoryId: '',
+        amount: '',
+        description: '',
+        date: new Date().toISOString().split('T')[0],
+      });
+    }
     setOpen(false);
+    if (onClose) onClose();
   };
 
   const buttonVariant = type === 'income' ? 'default' : 'destructive';
-  const title = type === 'income' ? 'Ավելացնել եկամուտ' : 'Ավելացնել ծախս';
+  const title = editMode 
+    ? (type === 'income' ? 'Խմբագրել եկամուտը' : 'Խմբագրել ծախսը')
+    : (type === 'income' ? 'Ավելացնել եկամուտ' : 'Ավելացնել ծախս');
 
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        <Button variant={buttonVariant} size="sm">
-          <Plus className="mr-2 h-4 w-4" />
-          {title}
-        </Button>
-      </DialogTrigger>
+    <Dialog open={open} onOpenChange={(isOpen) => {
+      setOpen(isOpen);
+      if (!isOpen && onClose) onClose();
+    }}>
+      {!editMode && (
+        <DialogTrigger asChild>
+          <Button variant={buttonVariant} size="sm">
+            <Plus className="mr-2 h-4 w-4" />
+            {title}
+          </Button>
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>{title}</DialogTitle>
@@ -114,7 +132,7 @@ export const TransactionDialog = ({ categories, onAdd, type }: TransactionDialog
           </div>
 
           <Button type="submit" className="w-full" variant={buttonVariant}>
-            Ավելացնել
+            {editMode ? 'Պահպանել' : 'Ավելացնել'}
           </Button>
         </form>
       </DialogContent>

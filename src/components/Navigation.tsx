@@ -1,13 +1,23 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, TrendingUp, TrendingDown, BarChart3, Menu } from 'lucide-react';
+import { LayoutDashboard, TrendingUp, TrendingDown, BarChart3, Menu, LogOut } from 'lucide-react';
 import { Sheet, SheetContent, SheetTrigger } from '@/components/ui/sheet';
 import { Button } from '@/components/ui/button';
 import { useState } from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
 export const Navigation = () => {
   const location = useLocation();
   const [open, setOpen] = useState(false);
+  const { logout, user } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    toast.success('Դուք դուրս եկաք');
+    navigate('/login');
+  };
 
   const links = [
     { href: '/', label: 'Վահանակ', icon: LayoutDashboard },
@@ -47,14 +57,30 @@ export const Navigation = () => {
     <nav className="sticky top-0 z-50 border-b bg-card/95 backdrop-blur supports-[backdrop-filter]:bg-card/60">
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 sm:gap-4">
             <div className="text-2xl">🚗</div>
-            <h1 className="text-lg sm:text-xl font-bold truncate">Ավտոդպրոց - Ֆինանսներ</h1>
+            <div>
+              <h1 className="text-lg sm:text-xl font-bold truncate">Ավտոդպրոց - Ֆինանսներ</h1>
+              {user && (
+                <span className="text-xs text-muted-foreground hidden sm:inline">
+                  {user.email}
+                </span>
+              )}
+            </div>
           </div>
           
           {/* Desktop Navigation */}
-          <div className="hidden md:flex gap-1">
+          <div className="hidden md:flex items-center gap-2">
             <NavLinks />
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="gap-2"
+            >
+              <LogOut className="h-4 w-4" />
+              Ելք
+            </Button>
           </div>
 
           {/* Mobile Navigation */}
@@ -67,6 +93,14 @@ export const Navigation = () => {
             <SheetContent side="right" className="w-64">
               <div className="mt-8 flex flex-col gap-2">
                 <NavLinks mobile />
+                <Button
+                  variant="ghost"
+                  onClick={handleLogout}
+                  className="justify-start gap-2"
+                >
+                  <LogOut className="h-4 w-4" />
+                  Ելք
+                </Button>
               </div>
             </SheetContent>
           </Sheet>

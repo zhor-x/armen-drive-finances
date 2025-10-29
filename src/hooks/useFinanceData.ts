@@ -1,6 +1,7 @@
 import {useEffect, useState} from 'react';
 import {Category, FinancialSummary, Transaction} from '@/types/finance';
 import api from '@/api';
+import {appendTransaction, mergeTransactionById, removeTransactionById, replaceTransactionById} from '@/utils/transactionState';
 
 export const useFinanceData = () => {
   const [incomeCategories, setIncomeCategories] = useState<Category[]>([]);
@@ -76,39 +77,45 @@ export const useFinanceData = () => {
     const tempTransaction: Transaction = { ...transaction, id: tempId };
 
     // Optimistically add to state
-    setTransactions(prev => [...prev, tempTransaction]);
+    setTransactions(prev => appendTransaction(prev, tempTransaction));
 
     try {
       const { data } = await api.post('/transactions', transaction);
 
       // Replace temporary transaction with real one from backend
-      setTransactions(prev => prev.map(t => t.id === tempId ? data.data : t));
+      setTransactions(prev => replaceTransactionById(prev, tempId, data.data));
     } catch (error) {
       // Remove temporary transaction if API fails
-      setTransactions(prev => prev.filter(t => t.id !== tempId));
+      setTransactions(prev => removeTransactionById(prev, tempId));
       console.error('Error adding transaction:', error);
     }
   };
   const updateTransaction = async (id: string, updatedTransaction: Partial<Transaction>) => {
     try {
       const {data} = await api.put(`/transactions/${id}`, updatedTransaction);
-      setTransactions(transactions.map(t => t.id === id ? data : t));
+      const isWrappedResponse = data && typeof data === 'object' && 'data' in data;
+      if (!isWrappedResponse) {
+        setTransactions(prev => mergeTransactionById(prev, id, data as Partial<Transaction>));
+        return;
+      }
+
+      setTransactions(prev => replaceTransactionById(prev, id, (data as {data: Transaction}).data));
     } catch (error) {
       console.error('Error updating transaction:', error);
     }
   };
 
   const deleteTransaction = async (id: string) => {
+    const previousTransactions = [...transactions];
     // Optimistically remove it from UI
-     setTransactions(transactions.filter(t => t.id !== id));
+    setTransactions(prev => removeTransactionById(prev, id));
 
     try {
       await api.delete(`/transactions/${id}`);
       // Already removed from state, so no further action
     } catch (error) {
       console.error('Error deleting transaction:', error);
-      // Optionally, rollback if deletion fails
-      // setTransactions(prev => [...prev, backupTransaction]);
+      setTransactions(previousTransactions);
     }
   };
 
@@ -116,9 +123,9 @@ export const useFinanceData = () => {
     try {
       const {data} = await api.post('/categories', category);
       if (category.type === 'income') {
-        setIncomeCategories([...incomeCategories, data.data]);
+        setIncomeCategories(prev => [...prev, data.data]);
       } else {
-        setExpenseCategories([...expenseCategories, data.data]);
+        setExpenseCategories(prev => [...prev, data.data]);
       }
     } catch (error) {
       console.error('Error adding category:', error);
@@ -129,11 +136,11 @@ export const useFinanceData = () => {
     try {
       await api.delete(`/categories/${id}`);
       if (type === 'income') {
-        setIncomeCategories(incomeCategories.filter(c => c.id !== id));
+        setIncomeCategories(prev => prev.filter(c => c.id !== id));
       } else {
-        setExpenseCategories(expenseCategories.filter(c => c.id !== id));
+        setExpenseCategories(prev => prev.filter(c => c.id !== id));
       }
-      setTransactions(transactions.filter(t => t.category_id !== id));
+      setTransactions(prev => prev.filter(t => t.category_id !== id));
     } catch (error) {
       console.error('Error deleting category:', error);
     }

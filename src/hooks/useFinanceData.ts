@@ -54,7 +54,7 @@ export const useFinanceData = () => {
     const expenseByCategory: Record<string, number> = {};
 
     transactions.forEach(t => {
-      const category_id = t.category_id ?? t.category_id; // <-- вот здесь важно
+      const category_id = t.category_id ?? t.category_id;
       if (t.type === 'income') {
         incomeByCategory[category_id] = (incomeByCategory[category_id] || 0) + parseFloat(t.amount);
       } else {

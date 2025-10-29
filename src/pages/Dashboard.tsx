@@ -3,7 +3,6 @@ import { CategorySummary } from '@/components/CategorySummary';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { Wallet, TrendingUp, TrendingDown } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Transaction } from '@/types/finance';
 import { format } from 'date-fns';
 import { hy } from 'date-fns/locale';
 
@@ -79,7 +78,7 @@ const Dashboard = () => {
         <CardContent>
           <div className="space-y-4">
             {recentTransactions.map((transaction) => {
-              const category = getCategoryById(transaction.categoryId);
+              const category = getCategoryById(transaction.category_id);
               return (
                 <div key={transaction.id} className="flex items-start sm:items-center justify-between p-3 rounded-lg bg-accent/50 gap-2">
                   <div className="flex items-start sm:items-center gap-2 sm:gap-3 min-w-0 flex-1">

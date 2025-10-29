@@ -9,7 +9,7 @@ import { Category, Transaction } from '@/types/finance';
 import { Plus } from 'lucide-react';
 
 interface TransactionDialogProps {
-  categories: Category[];
+  categories: [];
   onAdd: (transaction: Omit<Transaction, 'id'>) => void;
   type: 'income' | 'expense';
   editMode?: boolean;
@@ -20,12 +20,12 @@ interface TransactionDialogProps {
 export const TransactionDialog = ({ categories, onAdd, type, editMode, initialData, onClose }: TransactionDialogProps) => {
   const [open, setOpen] = useState(editMode || false);
   const [formData, setFormData] = useState(initialData ? {
-    categoryId: initialData.categoryId,
+    category_id: initialData.category_id,
     amount: initialData.amount.toString(),
     description: initialData.description || '',
     date: initialData.date,
   } : {
-    categoryId: '',
+    category_id: 0,
     amount: '',
     description: '',
     date: new Date().toISOString().split('T')[0],
@@ -33,10 +33,10 @@ export const TransactionDialog = ({ categories, onAdd, type, editMode, initialDa
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!formData.categoryId || !formData.amount) return;
+    if (!formData.category_id || !formData.amount) return;
 
     onAdd({
-      categoryId: formData.categoryId,
+      category_id: formData.category_id,
       amount: parseFloat(formData.amount),
       description: formData.description,
       date: formData.date,
@@ -45,7 +45,7 @@ export const TransactionDialog = ({ categories, onAdd, type, editMode, initialDa
 
     if (!editMode) {
       setFormData({
-        categoryId: '',
+        category_id: '',
         amount: '',
         description: '',
         date: new Date().toISOString().split('T')[0],
@@ -55,8 +55,8 @@ export const TransactionDialog = ({ categories, onAdd, type, editMode, initialDa
     if (onClose) onClose();
   };
 
-  const buttonVariant = type === 'income' ? 'default' : 'destructive';
-  const title = editMode 
+   const buttonVariant = type === 'income' ? 'default' : 'destructive';
+  const title = editMode
     ? (type === 'income' ? 'Խմբագրել եկամուտը' : 'Խմբագրել ծախսը')
     : (type === 'income' ? 'Ավելացնել եկամուտ' : 'Ավելացնել ծախս');
 
@@ -81,17 +81,19 @@ export const TransactionDialog = ({ categories, onAdd, type, editMode, initialDa
           <div className="space-y-2">
             <Label htmlFor="category">Կատեգորիա</Label>
             <Select
-              value={formData.categoryId}
-              onValueChange={(value) => setFormData({ ...formData, categoryId: value })}
+                value={formData.category_id.toString()} // ensure it's a string for Select
+                onValueChange={(value) =>
+                    setFormData({ ...formData, category_id: parseInt(value, 10) }) // convert back to int
+                }
             >
               <SelectTrigger id="category">
                 <SelectValue placeholder="Ընտրեք կատեգորիա" />
               </SelectTrigger>
               <SelectContent>
                 {categories.map((cat) => (
-                  <SelectItem key={cat.id} value={cat.id}>
-                    {cat.icon} {cat.name}
-                  </SelectItem>
+                    <SelectItem key={cat.id} value={`${cat.id}`}>
+                      {cat.icon} {cat.name}
+                    </SelectItem>
                 ))}
               </SelectContent>
             </Select>

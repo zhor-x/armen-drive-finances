@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TransactionDialog } from '@/components/TransactionDialog';
@@ -8,111 +8,204 @@ import { CategorySummary } from '@/components/CategorySummary';
 import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { exportToCSV } from '@/utils/export';
-import { TrendingUp, Download } from 'lucide-react';
+import { Download, TrendingUp } from 'lucide-react';
 import { DateRange } from 'react-day-picker';
-import { isWithinInterval } from 'date-fns';
+import { Transaction } from "@/types/finance.ts";
+
+const LIMIT = 20;
 
 const Income = () => {
-  const { incomeCategories, transactions, summary, addTransaction, updateTransaction, deleteTransaction, addCategory, deleteCategory } = useFinanceData();
+  const {
+    incomeCategories,
+    getTransactions,
+    summary,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    addCategory,
+    deleteCategory
+  } = useFinanceData();
+
+  // States
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const [searchTerm, setSearchTerm] = useState('');
+  const [localTransactions, setLocalTransactions] = useState<Transaction[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
+  const now = new Date();
+  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+      .toISOString()
+      .split('T')[0];
+  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+      .toISOString()
+      .split('T')[0];
+   const [dates, setDates] = useState<string[]>([firstDayOfMonth, lastDayOfMonth]);
 
-  const filteredTransactions = transactions.filter(t => {
-    if (t.type !== 'income') return false;
-    if (!dateRange?.from) return true;
-    const transactionDate = new Date(t.date);
-    if (dateRange.to) {
-      return isWithinInterval(transactionDate, { start: dateRange.from, end: dateRange.to });
+  // Default current month dates
+  useEffect(() => {
+    const now = new Date();
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
+    setDates([firstDayOfMonth, lastDayOfMonth]);
+  }, []);
+
+  // Update dates when dateRange changes
+  useEffect(() => {
+    if (dateRange?.from) {
+      const start = new Date(dateRange.from);
+      const end = dateRange.to ? new Date(dateRange.to) : start;
+      setDates([
+        start.toISOString().split('T')[0],
+        end.toISOString().split('T')[0],
+      ]);
     }
-    return transactionDate >= dateRange.from;
-  });
+  }, [dateRange]);
 
-  const filteredIncome = filteredTransactions.reduce((sum, t) => sum + t.amount, 0);
-
-  const formatAmount = (num: number) => {
-    return new Intl.NumberFormat('hy-AM', {
-      style: 'currency',
-      currency: 'AMD',
-      minimumFractionDigits: 0,
-      maximumFractionDigits: 0,
-    }).format(num);
+  // Build fetch object for API
+  const buildFetchObject = (offset: number) => {
+    const obj: any = {
+      type: 'income',
+      limit: LIMIT,
+      offset,
+    };
+    if (searchTerm) obj.q = searchTerm;
+    if (dates.length === 2) obj.dates = dates;
+    return obj;
   };
 
+  // Load transactions with infinite scroll
+  const loadTransactions = async (reset = false) => {
+    if (isLoading) return;
+    setIsLoading(true);
+
+    const currentOffset = reset ? 0 : localTransactions.length;
+
+    const fetched: Transaction[] = await getTransactions(buildFetchObject(currentOffset));
+
+    if (!fetched || fetched.length < LIMIT) setHasMore(false);
+    else setHasMore(true);
+
+
+    if (reset) {
+      setLocalTransactions(fetched);
+    } else {
+      setLocalTransactions(prev => {
+        const combined = [...prev, ...fetched];
+        // Remove duplicates by id
+        const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
+        return unique;
+      });
+    }
+
+    setIsLoading(false);
+  };
+
+  // Load/reset transactions when filters/search change
+  useEffect(() => {
+    loadTransactions(true);
+  }, [searchTerm, dateRange]);
+
+  // Calculate total income for summary
+  const filteredIncome = localTransactions.reduce(
+      (sum, t) => sum + parseFloat(t.amount as never),
+      0
+  );
+
+  const formatAmount = (num: number) =>
+      new Intl.NumberFormat('hy-AM', {
+        style: 'currency',
+        currency: 'AMD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(num);
+
   const handleExport = () => {
-    exportToCSV(filteredTransactions, incomeCategories, 'եկամուտներ.csv');
+    exportToCSV(localTransactions, incomeCategories, 'եկամուտներ.csv');
   };
 
   return (
-    <div className="container mx-auto px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center gap-2">
-            <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-success" />
-            Եկամուտներ
-          </h2>
-          <p className="text-sm sm:text-base text-muted-foreground">
-            Ավտոդպրոցի բոլոր եկամուտները և դրանց կատեգորիաները
-          </p>
-        </div>
-        <div className="flex gap-2 w-full sm:w-auto flex-wrap">
-          <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="mr-2 h-4 w-4" />
-            Արտահանել
-          </Button>
-          <CategoryDialog onAdd={addCategory} type="income" />
-          <TransactionDialog
-            categories={incomeCategories}
-            onAdd={addTransaction}
-            type="income"
-          />
-        </div>
-      </div>
-
-      <Card className="bg-gradient-income">
-        <CardContent className="p-4 sm:p-6">
-          <div className="text-center">
-            <p className="text-xs sm:text-sm font-medium text-white/90 mb-2">
-              {dateRange?.from ? 'Ընտրված ժամանակահատված' : 'Ընդհանուր եկամուտ'}
+      <div className="container mx-auto px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <h2 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center gap-2">
+              <TrendingUp className="h-6 w-6 sm:h-8 sm:w-8 text-success" />
+              Եկամուտներ
+            </h2>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Ավտոդպրոցի բոլոր եկամուտները և դրանց կատեգորիաները
             </p>
-            <p className="text-2xl sm:text-4xl font-bold text-white">{formatAmount(filteredIncome)}</p>
-            {dateRange?.from && (
-              <p className="text-xs sm:text-sm text-white/80 mt-2">
-                Ընդհանուր: {formatAmount(summary.totalIncome)}
-              </p>
-            )}
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
-        <div className="lg:col-span-2">
-          <Card>
-            <CardHeader>
-              <CardTitle>Բոլոր գործարքները</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <TransactionsTable
-                transactions={dateRange?.from ? filteredTransactions : transactions}
+          <div className="flex gap-2 w-full sm:w-auto flex-wrap">
+            <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="mr-2 h-4 w-4" /> Արտահանել
+            </Button>
+            <CategoryDialog onAdd={addCategory} type="income" />
+            <TransactionDialog
                 categories={incomeCategories}
-                onDelete={deleteTransaction}
-                onUpdate={updateTransaction}
+                onAdd={addTransaction}
                 type="income"
-              />
-            </CardContent>
-          </Card>
+            />
+          </div>
         </div>
 
-        <div>
-          <CategorySummary
-            categories={incomeCategories}
-            categoryTotals={summary.incomeByCategory}
-            total={summary.totalIncome}
-            type="income"
-            onDeleteCategory={(id) => deleteCategory(id, 'income')}
-          />
+        {/* Summary Card */}
+        <Card className="bg-gradient-income">
+          <CardContent className="p-4 sm:p-6">
+            <div className="text-center">
+              <p className="text-xs sm:text-sm font-medium text-white/90 mb-2">
+                {dateRange?.from ? 'Ընտրված ժամանակահատված' : 'Ընդհանուր եկամուտ'}
+              </p>
+              <p className="text-2xl sm:text-4xl font-bold text-white">{formatAmount(filteredIncome)}</p>
+              {dateRange?.from && (
+                  <p className="text-xs sm:text-sm text-white/80 mt-2">
+                    Ընդհանուր: {formatAmount(summary.totalIncome)}
+                  </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Transactions Table and Category Summary */}
+        <div className="grid gap-4 sm:gap-6 grid-cols-1 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <Card>
+              <CardHeader>
+                <CardTitle>Բոլոր գործարքները</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <TransactionsTable
+                    transactions={localTransactions}
+                    categories={incomeCategories}
+                    onDelete={deleteTransaction}
+                    onUpdate={updateTransaction}
+                    type="income"
+                    searchTerm={searchTerm}
+                    setSearchTerm={setSearchTerm}
+                    loadMore={loadTransactions}
+                    hasMore={hasMore}
+                    isLoading={isLoading}
+                />
+              </CardContent>
+            </Card>
+          </div>
+
+          <div>
+            <CategorySummary
+                categories={incomeCategories}
+                categoryTotals={summary.incomeByCategory}
+                total={summary.totalIncome}
+                type="income"
+                onDeleteCategory={(id) => deleteCategory(id, 'income')}
+            />
+          </div>
         </div>
       </div>
-    </div>
   );
 };
 

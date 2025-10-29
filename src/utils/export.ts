@@ -11,7 +11,7 @@ export const exportToCSV = (
   const headers = ['Ամսաթիվ', 'Կատեգորիա', 'Գումար', 'Նկարագրություն', 'Տիպ'];
   
   const rows = transactions.map(t => {
-    const category = getCategoryById(t.categoryId);
+    const category = getCategoryById(t.category_id);
     return [
       format(new Date(t.date), 'dd/MM/yyyy'),
       category?.name || '',

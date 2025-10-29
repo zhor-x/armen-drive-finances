@@ -1,5 +1,5 @@
 import { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import axios from "axios";
+import api, { setAuthToken } from "../api";
 
 interface User {
   id: number;
@@ -22,10 +22,6 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true); // ⬅️ added
 
-  const api = axios.create({
-    baseURL: import.meta.env.VITE_API_URL,
-  });
-
   useEffect(() => {
     const token = localStorage.getItem("access_token");
     const userData = localStorage.getItem("user_data");
@@ -35,7 +31,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         const parsedUser = JSON.parse(userData);
         setUser(parsedUser);
         setIsAuthenticated(true);
-        api.defaults.headers.common["Authorization"] = `Bearer ${token}`;
+        setAuthToken(token);
       } catch {
         localStorage.removeItem("user_data");
       }
@@ -50,7 +46,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       localStorage.setItem("access_token", data.data.token);
       localStorage.setItem("refresh_token", data.data.refresh_token);
       localStorage.setItem("user_data", JSON.stringify(data.data.user));
-      api.defaults.headers.common["Authorization"] = `Bearer ${data.data.token}`;
+      setAuthToken(data.data.token);
       setUser(data.data.user);
       setIsAuthenticated(true);
       return true;
@@ -64,7 +60,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     localStorage.removeItem("access_token");
     localStorage.removeItem("refresh_token");
     localStorage.removeItem("user_data");
-    delete api.defaults.headers.common["Authorization"];
+    setAuthToken(null);
     setIsAuthenticated(false);
     setUser(null);
   };

@@ -9,10 +9,13 @@ import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { exportToCSV } from '@/utils/export';
 import { Download, TrendingUp } from 'lucide-react';
-import { DateRange } from 'react-day-picker';
-import { Transaction } from "@/types/finance.ts";
+import type { DateRange } from 'react-day-picker';
+import type { Transaction } from '@/types/finance';
 
 const LIMIT = 20;
+
+const isValidTransaction = (t: any): t is Transaction =>
+    !!t && typeof t === 'object' && 'id' in t && 'amount' in t;
 
 const Income = () => {
   const {
@@ -32,6 +35,7 @@ const Income = () => {
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
+
   const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       .toISOString()
@@ -39,7 +43,7 @@ const Income = () => {
   const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
       .toISOString()
       .split('T')[0];
-   const [dates, setDates] = useState<string[]>([firstDayOfMonth, lastDayOfMonth]);
+  const [dates, setDates] = useState<string[]>([firstDayOfMonth, lastDayOfMonth]);
 
   // Default current month dates
   useEffect(() => {
@@ -84,18 +88,19 @@ const Income = () => {
 
     const currentOffset = reset ? 0 : localTransactions.length;
 
-    const fetched: Transaction[] = await getTransactions(buildFetchObject(currentOffset));
+    const fetched = (await getTransactions(buildFetchObject(currentOffset))) ?? [];
 
-    if (!fetched || fetched.length < LIMIT) setHasMore(false);
-    else setHasMore(true);
+    // pagination flag
+    setHasMore(fetched.length >= LIMIT);
 
+    // sanitize
+    const cleanedFetched = fetched.filter(isValidTransaction);
 
     if (reset) {
-      setLocalTransactions(fetched);
+      setLocalTransactions(cleanedFetched);
     } else {
       setLocalTransactions(prev => {
-        const combined = [...prev, ...fetched];
-        // Remove duplicates by id
+        const combined = [...prev, ...cleanedFetched].filter(isValidTransaction);
         const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
         return unique;
       });
@@ -107,13 +112,15 @@ const Income = () => {
   // Load/reset transactions when filters/search change
   useEffect(() => {
     loadTransactions(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, dateRange]);
 
-  // Calculate total income for summary
-  const filteredIncome = localTransactions.reduce(
-      (sum, t) => sum + parseFloat(t.amount as never),
-      0
-  );
+  // Calculate total income for summary (safe)
+  const filteredIncome = localTransactions.reduce((sum, t) => {
+    if (!t || t.amount == null) return sum;
+    const n = Number(t.amount);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
 
   const formatAmount = (num: number) =>
       new Intl.NumberFormat('hy-AM', {
@@ -125,6 +132,50 @@ const Income = () => {
 
   const handleExport = () => {
     exportToCSV(localTransactions, incomeCategories, 'եկամուտներ.csv');
+  };
+
+  // Keep local list consistent when deleting/updating
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      await deleteTransaction(id);
+      setLocalTransactions(prev => prev.filter(t => t?.id !== id));
+    } catch (e) {
+      console.error('Error deleting transaction:', e);
+    }
+  };
+
+  const handleUpdateTransaction = async (id: string, transaction: Partial<Transaction>) => {
+    try {
+      await updateTransaction(id, transaction);
+      setLocalTransactions(prev =>
+          prev
+              .filter(isValidTransaction)
+              .map(t => (t.id === id ? { ...t, ...transaction } : t))
+      );
+    } catch (e) {
+      console.error('Error updating transaction:', e);
+    }
+  };
+
+  // ✅ HERE: Safe handleAddTransaction
+  const handleAddTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+    try {
+      const created = await addTransaction(transaction);
+
+      // If backend didn’t return a full object (or returned void/bool), refetch to avoid inserting undefined
+      if (!isValidTransaction(created)) {
+        await loadTransactions(true);
+        return;
+      }
+
+      setLocalTransactions(prev => {
+        const next = [created, ...prev].filter(isValidTransaction);
+        const unique = Array.from(new Map(next.map(t => [t.id, t])).values());
+        return unique;
+      });
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+    }
   };
 
   return (
@@ -148,7 +199,7 @@ const Income = () => {
             <CategoryDialog onAdd={addCategory} type="income" />
             <TransactionDialog
                 categories={incomeCategories}
-                onAdd={addTransaction}
+                onAdd={handleAddTransaction}
                 type="income"
             />
           </div>
@@ -164,7 +215,7 @@ const Income = () => {
               <p className="text-2xl sm:text-4xl font-bold text-white">{formatAmount(filteredIncome)}</p>
               {dateRange?.from && (
                   <p className="text-xs sm:text-sm text-white/80 mt-2">
-                    Ընդհանուր: {formatAmount(summary.totalIncome)}
+                    Ընդհանուր: {formatAmount(Number(summary.totalIncome) || 0)}
                   </p>
               )}
             </div>
@@ -182,8 +233,8 @@ const Income = () => {
                 <TransactionsTable
                     transactions={localTransactions}
                     categories={incomeCategories}
-                    onDelete={deleteTransaction}
-                    onUpdate={updateTransaction}
+                    onDelete={handleDeleteTransaction}
+                    onUpdate={handleUpdateTransaction}
                     type="income"
                     searchTerm={searchTerm}
                     setSearchTerm={setSearchTerm}
@@ -201,7 +252,7 @@ const Income = () => {
                 categoryTotals={summary.incomeByCategory}
                 total={summary.totalIncome}
                 type="income"
-                onDeleteCategory={(id) => deleteCategory(id, 'income')}
+                onDeleteCategory={(id: string) => deleteCategory(id, 'income')}
             />
           </div>
         </div>

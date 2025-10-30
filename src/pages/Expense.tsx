@@ -9,21 +9,33 @@ import { DateRangeFilter } from '@/components/DateRangeFilter';
 import { useFinanceData } from '@/hooks/useFinanceData';
 import { exportToCSV } from '@/utils/export';
 import { TrendingDown, Download } from 'lucide-react';
-import { DateRange } from 'react-day-picker';
-import { Transaction } from "@/types/finance.ts";
+import type { DateRange } from 'react-day-picker';
+import type { Transaction } from '@/types/finance';
 
 const LIMIT = 20;
 
+const isValidTransaction = (t: any): t is Transaction =>
+    !!t && typeof t === 'object' && 'id' in t && 'amount' in t;
+
 const Expense = () => {
-  const { expenseCategories, getTransactions, summary, addTransaction, updateTransaction, deleteTransaction, addCategory, deleteCategory } = useFinanceData();
+  const {
+    expenseCategories,
+    getTransactions,
+    summary,
+    addTransaction,
+    updateTransaction,
+    deleteTransaction,
+    addCategory,
+    deleteCategory,
+  } = useFinanceData();
 
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
-  const now = new Date();
   const [searchTerm, setSearchTerm] = useState('');
 
+  const now = new Date();
   const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       .toISOString()
       .split('T')[0];
@@ -35,8 +47,12 @@ const Expense = () => {
   // Default current month
   useEffect(() => {
     const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
+        .toISOString()
+        .split('T')[0];
+    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
+        .toISOString()
+        .split('T')[0];
     setDates([firstDayOfMonth, lastDayOfMonth]);
   }, []);
 
@@ -51,7 +67,9 @@ const Expense = () => {
 
   useEffect(() => {
     loadTransactions(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, dateRange]);
+
   // Build fetch object
   const buildFetchObject = (offset: number) => {
     const obj: any = {
@@ -64,7 +82,6 @@ const Expense = () => {
     return obj;
   };
 
-
   // Load transactions
   const loadTransactions = async (reset = false) => {
     if (isLoading) return;
@@ -72,16 +89,20 @@ const Expense = () => {
 
     const currentOffset = reset ? 0 : localTransactions.length;
 
-    const fetched: Transaction[] = await getTransactions(buildFetchObject(currentOffset));
+    const fetched = (await getTransactions(buildFetchObject(currentOffset))) ?? [];
 
-    if (!fetched || fetched.length < LIMIT) setHasMore(false);
-    else setHasMore(true);
+    // pagination flag
+    setHasMore(fetched.length >= LIMIT);
+
+    // sanitize fetched
+    const cleanedFetched = fetched.filter(isValidTransaction);
 
     if (reset) {
-      setLocalTransactions(fetched);
+      setLocalTransactions(cleanedFetched);
     } else {
       setLocalTransactions(prev => {
-        const combined = [...prev, ...fetched];
+        const combined = [...prev, ...cleanedFetched].filter(isValidTransaction);
+        // dedupe by id
         const unique = Array.from(new Map(combined.map(t => [t.id, t])).values());
         return unique;
       });
@@ -90,25 +111,65 @@ const Expense = () => {
     setIsLoading(false);
   };
 
-  // Reset/load transactions on filter change
-
-
-  // Calculate total expense
-  const filteredExpense = localTransactions.reduce((sum, t) => sum + parseFloat(t.amount as never), 0);
+  // Calculate total expense (safe)
+  const filteredExpense = localTransactions.reduce((sum, t) => {
+    if (!t || t.amount == null) return sum;
+    const n = Number(t.amount);
+    return sum + (Number.isFinite(n) ? n : 0);
+  }, 0);
 
   const formatAmount = (num: number) =>
-      new Intl.NumberFormat('hy-AM', { style: 'currency', currency: 'AMD', minimumFractionDigits: 0, maximumFractionDigits: 0 }).format(num);
+      new Intl.NumberFormat('hy-AM', {
+        style: 'currency',
+        currency: 'AMD',
+        minimumFractionDigits: 0,
+        maximumFractionDigits: 0,
+      }).format(num);
 
   const handleExport = () => exportToCSV(localTransactions, expenseCategories, 'ծախսեր.csv');
-  const handleDeleteTransaction = (id: string) => {
-    deleteTransaction(id);
-    setLocalTransactions(prev => prev.filter(t => t.id !== id));
-  };
-  const handleUpdateTransaction = (id: string, transaction: Partial<Transaction>) => {
-    updateTransaction(id, transaction);
-    setLocalTransactions(prev => prev.map(t => t.id === id ? { ...t, ...transaction } : t));
+
+  const handleDeleteTransaction = async (id: string) => {
+    try {
+      await deleteTransaction(id);
+      setLocalTransactions(prev => prev.filter(t => t?.id !== id));
+    } catch (e) {
+      console.error('Error deleting transaction:', e);
+    }
   };
 
+  const handleUpdateTransaction = async (id: string, transaction: Partial<Transaction>) => {
+    try {
+      await updateTransaction(id, transaction);
+      setLocalTransactions(prev =>
+          prev
+              .filter(isValidTransaction)
+              .map(t => (t.id === id ? { ...t, ...transaction } : t))
+      );
+    } catch (e) {
+      console.error('Error updating transaction:', e);
+    }
+  };
+
+  const handleAddTransaction = async (transaction: Omit<Transaction, 'id'>) => {
+    try {
+      const created = await addTransaction(transaction);
+
+      // If backend didn’t return a full object, fallback to refetch
+      if (!isValidTransaction(created)) {
+        await loadTransactions(true);
+        return;
+      }
+
+      setLocalTransactions(prev => {
+        const next = [created, ...prev].filter(isValidTransaction);
+        // dedupe by id to avoid double items if refetched soon after
+        const unique = Array.from(new Map(next.map(t => [t.id, t])).values());
+        return unique;
+      });
+    } catch (error) {
+      console.error('Error adding transaction:', error);
+    }
+  };
 
   return (
       <div className="container mx-auto px-4 py-4 sm:py-8 space-y-4 sm:space-y-8">
@@ -118,7 +179,9 @@ const Expense = () => {
             <h2 className="text-2xl sm:text-3xl font-bold mb-2 flex items-center gap-2">
               <TrendingDown className="h-6 w-6 sm:h-8 sm:w-8 text-destructive" /> Ծախսեր
             </h2>
-            <p className="text-sm sm:text-base text-muted-foreground">Ավտոդպրոցի բոլոր ծախսերը և դրանց կատեգորիաները</p>
+            <p className="text-sm sm:text-base text-muted-foreground">
+              Ավտոդպրոցի բոլոր ծախսերը և դրանց կատեգորիաները
+            </p>
           </div>
           <div className="flex gap-2 w-full sm:w-auto flex-wrap">
             <DateRangeFilter dateRange={dateRange} onDateRangeChange={setDateRange} />
@@ -126,7 +189,7 @@ const Expense = () => {
               <Download className="mr-2 h-4 w-4" /> Արտահանել
             </Button>
             <CategoryDialog onAdd={addCategory} type="expense" />
-            <TransactionDialog categories={expenseCategories} onAdd={addTransaction} type="expense" />
+            <TransactionDialog categories={expenseCategories} onAdd={handleAddTransaction} type="expense" />
           </div>
         </div>
 
@@ -140,7 +203,7 @@ const Expense = () => {
               <p className="text-2xl sm:text-4xl font-bold text-white">{formatAmount(filteredExpense)}</p>
               {dateRange?.from && (
                   <p className="text-xs sm:text-sm text-white/80 mt-2">
-                    Ընդհանուր: {formatAmount(parseFloat(summary.totalExpense as never))}
+                    Ընդհանուր: {formatAmount(Number(summary.totalExpense) || 0)}
                   </p>
               )}
             </div>
@@ -177,7 +240,7 @@ const Expense = () => {
                 categoryTotals={summary.expenseByCategory}
                 total={summary.totalExpense}
                 type="expense"
-                onDeleteCategory={(id) => deleteCategory(id, 'expense')}
+                onDeleteCategory={(id: string) => deleteCategory(id, 'expense')}
             />
           </div>
         </div>

@@ -43,14 +43,19 @@ const Analytics = () => {
     transactions.forEach(t => {
       const monthKey = format(parseISO(t.date), 'yyyy-MM');
       if (!grouped[monthKey]) grouped[monthKey] = { income: 0, expense: 0 };
-      if (t.type === 'income') grouped[monthKey].income += t.amount;
-      else grouped[monthKey].expense += t.amount;
+      if (t.type === 'income') grouped[monthKey].income += parseFloat(t.amount);
+      else grouped[monthKey].expense += parseFloat(t.amount);
+    });
+
+    Object.keys(grouped).map(key => {
+      console.log(grouped[key])
     });
 
     return Object.keys(grouped)
         .sort()
         .slice(-6)
         .map(key => ({
+
           month: format(parseISO(key + '-01'), 'MMM', { locale: hy }),
           Եկամուտ: grouped[key].income,
           Ծախս: grouped[key].expense,

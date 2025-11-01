@@ -109,7 +109,7 @@ const Expense = () => {
 
   const buildFetchObject = (offset: number) => {
     const obj: any = {
-      type: 'income',
+      type: 'expense',
       limit: LIMIT,
       offset,
       dates: apiDates,

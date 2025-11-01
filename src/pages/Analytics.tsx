@@ -54,7 +54,7 @@ const Analytics = () => {
           month: format(parseISO(key + '-01'), 'MMM', { locale: hy }),
           Եկամուտ: grouped[key].income,
           Ծախս: grouped[key].expense,
-          Շահույթ: grouped[key].income - grouped[key].expense,
+          Շահույթ: grouped[key].income - parseFloat(grouped[key].expense),
         }));
   })();
 

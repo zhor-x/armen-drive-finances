@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TransactionDialog } from '@/components/TransactionDialog';
@@ -17,6 +17,22 @@ const LIMIT = 20;
 const isValidTransaction = (t: any): t is Transaction =>
     !!t && typeof t === 'object' && 'id' in t && 'amount' in t;
 
+// ✅ Local-safe formatter (no UTC shift)
+const formatYYYYMMDD = (d: Date) => {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${y}-${m}-${day}`;
+};
+
+// ✅ Helpers for current month
+const getCurrentMonthRange = (): { from: Date; to: Date } => {
+  const now = new Date();
+  const from = new Date(now.getFullYear(), now.getMonth(), 1);
+  const to = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+  return { from, to };
+};
+
 const Income = () => {
   const {
     incomeCategories,
@@ -29,55 +45,67 @@ const Income = () => {
     deleteCategory
   } = useFinanceData();
 
-  // States
-  const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  // ✅ Default the picker to the first/last day of the current month
+  const defaultRange = useMemo(getCurrentMonthRange, []);
+  const [dateRange, setDateRange] = useState<DateRange | undefined>(defaultRange);
+
   const [searchTerm, setSearchTerm] = useState('');
   const [localTransactions, setLocalTransactions] = useState<Transaction[]>([]);
   const [hasMore, setHasMore] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
-  const now = new Date();
-  const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-      .toISOString()
-      .split('T')[0];
-  const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-      .toISOString()
-      .split('T')[0];
-  const [dates, setDates] = useState<string[]>([firstDayOfMonth, lastDayOfMonth]);
+  // ✅ Derive API-ready `dates` from `dateRange`
+  const [dates, setDates] = useState<string[]>([
+    formatYYYYMMDD(defaultRange.from),
+    formatYYYYMMDD(defaultRange.to),
+  ]);
 
-  // Default current month dates
+  // 🔁 Keep `dates` synced with the picker; if cleared, reset to current month
   useEffect(() => {
-    const now = new Date();
-    const firstDayOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
-        .toISOString()
-        .split('T')[0];
-    const lastDayOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0)
-        .toISOString()
-        .split('T')[0];
-    setDates([firstDayOfMonth, lastDayOfMonth]);
-  }, []);
-
-  // Update dates when dateRange changes
-  useEffect(() => {
-    if (dateRange?.from) {
+    if (dateRange?.to && dateRange?.from) {
       const start = new Date(dateRange.from);
       const end = dateRange.to ? new Date(dateRange.to) : start;
-      setDates([
-        start.toISOString().split('T')[0],
-        end.toISOString().split('T')[0],
-      ]);
+      setDates([formatYYYYMMDD(start), formatYYYYMMDD(end)]);
+    } else {
+      // reset to current month if user clears selection
+      const fresh = getCurrentMonthRange();
+      setDateRange(fresh);
+      setDates([formatYYYYMMDD(fresh.from), formatYYYYMMDD(fresh.to)]);
     }
   }, [dateRange]);
 
   // Build fetch object for API
+
+  const apiDates = useMemo<string[]>(() => {
+    const formatYYYYMMDD = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const getCurrentMonthRange = () => {
+      const now = new Date();
+      return {
+        from: new Date(now.getFullYear(), now.getMonth(), 1),
+        to: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+      };
+    };
+
+    if (dateRange?.from) {
+      const start = new Date(dateRange.from);
+      const end = new Date(dateRange.to ?? dateRange.from);
+      return [formatYYYYMMDD(start), formatYYYYMMDD(end)];
+    }
+
+    const fresh = getCurrentMonthRange();
+    return [formatYYYYMMDD(fresh.from), formatYYYYMMDD(fresh.to)];
+  }, [dateRange]);
+
   const buildFetchObject = (offset: number) => {
     const obj: any = {
       type: 'income',
       limit: LIMIT,
       offset,
+      dates: apiDates,
     };
     if (searchTerm) obj.q = searchTerm;
-    if (dates.length === 2) obj.dates = dates;
     return obj;
   };
 
@@ -87,7 +115,7 @@ const Income = () => {
     setIsLoading(true);
 
     const currentOffset = reset ? 0 : localTransactions.length;
-
+    console.log(buildFetchObject(currentOffset))
     const fetched = (await getTransactions(buildFetchObject(currentOffset))) ?? [];
 
     // pagination flag
@@ -109,9 +137,8 @@ const Income = () => {
     setIsLoading(false);
   };
 
-  // Load/reset transactions when filters/search change
   useEffect(() => {
-    loadTransactions(true);
+     loadTransactions(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, dateRange]);
 
@@ -157,12 +184,10 @@ const Income = () => {
     }
   };
 
-  // ✅ HERE: Safe handleAddTransaction
   const handleAddTransaction = async (transaction: Omit<Transaction, 'id'>) => {
     try {
       const created = await addTransaction(transaction);
 
-      // If backend didn’t return a full object (or returned void/bool), refetch to avoid inserting undefined
       if (!isValidTransaction(created)) {
         await loadTransactions(true);
         return;
@@ -212,7 +237,9 @@ const Income = () => {
               <p className="text-xs sm:text-sm font-medium text-white/90 mb-2">
                 {dateRange?.from ? 'Ընտրված ժամանակահատված' : 'Ընդհանուր եկամուտ'}
               </p>
-              <p className="text-2xl sm:text-4xl font-bold text-white">{formatAmount(filteredIncome)}</p>
+              <p className="text-2xl sm:text-4xl font-bold text-white">
+                {formatAmount(filteredIncome)}
+              </p>
               {dateRange?.from && (
                   <p className="text-xs sm:text-sm text-white/80 mt-2">
                     Ընդհանուր: {formatAmount(Number(summary.totalIncome) || 0)}

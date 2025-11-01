@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import {useEffect, useMemo, useState} from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { TransactionDialog } from '@/components/TransactionDialog';
@@ -58,27 +58,63 @@ const Expense = () => {
 
   // Update dates when dateRange changes
   useEffect(() => {
-    if (dateRange?.from) {
+    if (dateRange?.to && dateRange?.from) {
       const start = new Date(dateRange.from);
       const end = dateRange.to ? new Date(dateRange.to) : start;
-      setDates([start.toISOString().split('T')[0], end.toISOString().split('T')[0]]);
+      setDates([formatYYYYMMDD(start), formatYYYYMMDD(end)]);
+    } else {
+      // reset to current month if user clears selection
+      const fresh = getCurrentMonthRange();
+      setDateRange(fresh);
+      setDates([formatYYYYMMDD(fresh.from), formatYYYYMMDD(fresh.to)]);
     }
   }, [dateRange]);
+
+  const getCurrentMonthRange = () => {
+    const now = new Date();
+    return {
+      from: new Date(now.getFullYear(), now.getMonth(), 1),
+      to: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+    };
+  };
 
   useEffect(() => {
     loadTransactions(true);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchTerm, dateRange]);
 
-  // Build fetch object
+  const apiDates = useMemo<string[]>(() => {
+    const formatYYYYMMDD = (d: Date) =>
+        `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    const getCurrentMonthRange = () => {
+      const now = new Date();
+      return {
+        from: new Date(now.getFullYear(), now.getMonth(), 1),
+        to: new Date(now.getFullYear(), now.getMonth() + 1, 0),
+      };
+    };
+
+    if (dateRange?.from) {
+      const start = new Date(dateRange.from);
+      const end = new Date(dateRange.to ?? dateRange.from);
+      return [formatYYYYMMDD(start), formatYYYYMMDD(end)];
+    }
+
+    const fresh = getCurrentMonthRange();
+    return [formatYYYYMMDD(fresh.from), formatYYYYMMDD(fresh.to)];
+  }, [dateRange]);
+  const formatYYYYMMDD = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
   const buildFetchObject = (offset: number) => {
     const obj: any = {
-      type: 'expense',
+      type: 'income',
       limit: LIMIT,
       offset,
+      dates: apiDates,
     };
     if (searchTerm) obj.q = searchTerm;
-    if (dates.length === 2) obj.dates = dates;
     return obj;
   };
 
